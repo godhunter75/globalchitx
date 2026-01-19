@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UltraChat X</title>
+
+<style>
+/* ===== RESET ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== BODY ===== */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  background: #0b1020;
+  color: #fff;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== HEADER ===== */
+header {
+  background: #020617;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header h1 {
+  font-size: 16px;
+}
+
+header select {
+  background: #1e293b;
+  color: #fff;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+/* ===== STATUS ===== */
+#status {
+  font-size: 12px;
+  color: #38bdf8;
+}
+
+/* ===== CHAT AREA ===== */
+#messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* ===== MESSAGE ===== */
+.msg {
+  background: #1e293b;
+  padding: 10px 14px;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  max-width: 80%;
+  animation: fadeIn 0.2s ease;
+}
+
+.me {
+  background: #2563eb;
+  margin-left: auto;
+}
+
+.system {
+  background: transparent;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.name {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ===== TYPING ===== */
+#typing {
+  font-size: 12px;
+  padding: 6px 12px;
+  opacity: 0.6;
+}
+
+/* ===== FOOTER ===== */
+footer {
+  background: #020617;
+  padding: 10px;
+  display: flex;
+}
+
+footer input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+}
+
+footer button {
+  margin-left: 8px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ===== ANIMATION ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🌍 UltraChat X</h1>
+  <select id="room">
+    <option value="global">Global</option>
+    <option value="tech">Tech</option>
+    <option value="fun">Fun</option>
+  </select>
+  <div id="status">Online: 0</div>
+</header>
+
+<div id="messages"></div>
+<div id="typing"></div>
+
+<footer>
+  <input id="input" placeholder="Type your message…" />
+  <button onclick="sendMessage()">Send</button>
+</footer>
+
+<script type="module">
+/* ===== FIREBASE IMPORTS ===== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp,
+  query, orderBy, onSnapshot, doc, setDoc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+/* ===== FIREBASE CONFIG ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyChLsR1uRkM_mN7igdb0vZHXaSASceDP60",
+  authDomain: "globalchitx.firebaseapp.com",
+  projectId: "globalchitx",
+  storageBucket: "globalchitx.firebasestorage.app",
+  messagingSenderId: "125407962400",
+  appId: "125407962400"
+};
+
+/* ===== INIT ===== */
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* ===== USER DATA ===== */
+const uidColor = `hsl(${Math.random()*360},70%,60%)`;
+const nickname = "User" + Math.floor(Math.random()*9000);
+let uid = null;
+let lastSend = 0;
+
+/* ===== ELEMENTS ===== */
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("input");
+const roomEl = document.getElementById("room");
+const statusEl = document.getElementById("status");
+const typingEl = document.getElementById("typing");
+
+/* ===== AUTH ===== */
+signInAnonymously(auth).then(res => {
+  uid = res.user.uid;
+  setDoc(doc(db,"online",uid),{ room: roomEl.value, name: nickname });
+  addSystemMessage(`${nickname} joined`);
+  window.addEventListener("beforeunload",()=>{
+    deleteDoc(doc(db,"online",uid));
+    addSystemMessage(`${nickname} left`);
+  });
+});
+
+/* ===== PROFANITY FILTER ===== */
+const badWords = ["fuck","shit","bitch"];
+function cleanText(text){
+  badWords.forEach(w=>{
+    const r = new RegExp(w,"gi");
+    text = text.replace(r,"***");
+  });
+  return text;
+}
+
+/* ===== SEND MESSAGE ===== */
+window.sendMessage = async () => {
+  let text = inputEl.value.trim();
+  if(!text) return;
+  if(Date.now() - lastSend < 1200) return; // anti spam
+  lastSend = Date.now();
+  inputEl.value = "";
+  text = cleanText(text);
+
+  await addDoc(collection(db,"messages"),{
+    text,
+    uid,
+    nick: nickname,
+    color: uidColor,
+    room: roomEl.value,
+    time: serverTimestamp()
+  });
+};
+
+/* ===== SYSTEM MESSAGE ===== */
+async function addSystemMessage(text){
+  await addDoc(collection(db,"messages"),{
+    system: true,
+    text,
+    room: roomEl.value,
+    time: serverTimestamp()
+  });
+}
+
+/* ===== LISTEN MESSAGES ===== */
+function listenMessages(){
+  onSnapshot(
+    query(collection(db,"messages"), orderBy("time")),
+    snap=>{
+      messagesEl.innerHTML="";
+      snap.docs
+        .map(d=>d.data())
+        .filter(m=>m.room===roomEl.value)
+        .slice(-150)
+        .forEach(m=>{
+          const div=document.createElement("div");
+          if(m.system){
+            div.className="system";
+            div.textContent=m.text;
+          }else{
+            div.className="msg"+(m.uid===uid?" me":"");
+            div.innerHTML=`<div class="name" style="color:${m.color}">${m.nick}</div>${m.text}`;
+          }
+          messagesEl.appendChild(div);
+        });
+      messagesEl.scrollTop=messagesEl.scrollHeight;
+    }
+  );
+}
+listenMessages();
+roomEl.onchange = listenMessages;
+
+/* ===== ONLINE COUNT ===== */
+onSnapshot(collection(db,"online"), snap=>{
+  statusEl.textContent="Online: "+snap.size;
+});
+
+/* ===== TYPING INDICATOR ===== */
+inputEl.addEventListener("input",()=>{
+  setDoc(doc(db,"typing",uid),{ nick: nickname });
+  setTimeout(()=>deleteDoc(doc(db,"typing",uid)),1000);
+});
+
+onSnapshot(collection(db,"typing"), snap=>{
+  const users = snap.docs.map(d=>d.data().nick).filter(n=>n!==nickname);
+  typingEl.textContent = users.length ? users[0]+" typing…" : "";
+});
+</script>
+
+</body>
+</html>
