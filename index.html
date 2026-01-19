@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global ChitX</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+header {
+  background: #020617;
+  padding: 15px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.message {
+  background: #1e293b;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.me {
+  background: #2563eb;
+  margin-left: auto;
+}
+
+footer {
+  display: flex;
+  padding: 10px;
+  background: #020617;
+}
+
+input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+}
+
+button {
+  margin-left: 10px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+</style>
+</head>
+
+<body>
+
+<header>🌍 Global ChitX</header>
+
+<div id="messages"></div>
+
+<footer>
+  <input id="msgInput" placeholder="Type a message..." />
+  <button onclick="sendMessage()">Send</button>
+</footer>
+
+<!-- FIREBASE LOGIC -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+/* 🔥 YOUR FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyChLsR1uRkM_mN7igdb0vZHXaSASceDP60",
+  authDomain: "globalchitx.firebaseapp.com",
+  projectId: "globalchitx",
+  storageBucket: "globalchitx.firebasestorage.app",
+  messagingSenderId: "125407962400",
+  appId: "125407962400"
+};
+
+/* INIT */
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let userId = null;
+
+/* ANONYMOUS LOGIN */
+signInAnonymously(auth).then(res => {
+  userId = res.user.uid;
+});
+
+/* ELEMENTS */
+const messagesDiv = document.getElementById("messages");
+const input = document.getElementById("msgInput");
+
+/* SEND MESSAGE */
+window.sendMessage = async () => {
+  const text = input.value.trim();
+  if (!text || text.length > 200) return;
+
+  input.value = "";
+
+  await addDoc(collection(db, "messages"), {
+    text: text,
+    uid: userId,
+    time: serverTimestamp()
+  });
+};
+
+/* REALTIME LISTENER */
+const q = query(collection(db, "messages"), orderBy("time"));
+onSnapshot(q, snapshot => {
+  messagesDiv.innerHTML = "";
+  snapshot.forEach(doc => {
+    const msg = doc.data();
+    const div = document.createElement("div");
+    div.className = "message" + (msg.uid === userId ? " me" : "");
+    div.textContent = msg.text;
+    messagesDiv.appendChild(div);
+  });
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+});
+</script>
+
+</body>
+</html>
